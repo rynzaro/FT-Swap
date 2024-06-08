@@ -117,13 +117,6 @@ Handlers.add(
             print('Deleting Order')
             OpenOrders[id] = nil
         end
-
-
-
-
-
-
-
     end
 )
 
@@ -134,7 +127,6 @@ Handlers.add(
         assert(type(msg.OrderId) == 'string', 'You need to input an Order ID')
         orderId = tonumber(msg.OrderId)
         assert(orderId < CurrentId, 'You need to pick an Id that is lower than the current once: '.. CurrentId)
-
         print(OpenOrders[orderId])
 
     end
