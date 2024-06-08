@@ -43,7 +43,7 @@ Handlers.add(
         assert(type(msg.ToAmount) == 'string', 'Need to input amount to exchange to!')
 
         -- we wanna handle that through an error message
-        assert(tonumber(ReceivedTokens[msg.FromContract][msg.From]) > tonumber(msg.FromAmount), 'balance must be higher than token amount to exchange from')
+        assert(tonumber(ReceivedTokens[msg.FromContract][msg.From]) >= tonumber(msg.FromAmount), 'balance must be higher than token amount to exchange from')
         local sender = msg.From
         local sender_balance = ReceivedTokens[msg.FromContract][sender]
 
@@ -61,12 +61,15 @@ Handlers.add(
         }
 
         ReceivedTokens[msg.FromContract][sender] = sender_balance - msg.FromAmount
-        print('Sender balance after ' .. ReceivedTokens[msg.FromContract][sender])
 
         OpenOrders[CurrentId] = order
         CurrentId = CurrentId + 1;
         print('Created order with order id '.. order.OrderId)
         print(order)
+        ao.send({
+            Target = msg.From,
+            Data = 'Make Order succesful'
+        })
     end
 )
 
