@@ -12,24 +12,27 @@ Handlers.add(
     function(msg)
         local depositContractId = msg.From
         local sender = msg.Tags.Sender
-        local quantity = msg.Tags.Quantity
+        local quantity = bint(msg.Tags.Quantity)
 
         if not ReceivedTokens[depositContractId] then
             --if contract ID has n record, create it
             print('Register Contract ID')
-            ReceivedTokens[depositContractId] = {[sender] = quantity}
+            ReceivedTokens[depositContractId] = {[sender] = tostring(quantity)}
         else
             if not ReceivedTokens[depositContractId][sender] then
                 print('Sender is depositing this currency for the first time')
-                ReceivedTokens[depositContractId][sender] = quantity
+                ReceivedTokens[depositContractId][sender] = tostring(quantity)
             else
                 print('Updating deposit for existing sender.')
-                ReceivedTokens[depositContractId][sender] = quantity + ReceivedTokens[depositContractId][sender]
+                ReceivedTokens[depositContractId][sender] = tostring(bint.__add(quantity, bint(ReceivedTokens[depositContractId][sender])))
             end
         end
-        print('Succesfully Added Deposit')
-        print('Contract Id: ' .. depositContractId)
-        print('Balance: ' .. ReceivedTokens[depositContractId][sender])
+        ao.send({
+            Target = msg.Tags.Sender,
+            Action = 'Deposit-Notice',
+            Data = 'Succesfully deposited ' .. tostring(quantity) .. ' tokens from fungible token process ' .. msg.From,
+            Balance = tostring(ReceivedTokens[depositContractId][sender])
+        })
     end
 )
 
@@ -44,10 +47,15 @@ Handlers.add(
 
         -- we wanna handle that through an error message
         assert(tonumber(ReceivedTokens[msg.FromContract][msg.From]) >= tonumber(msg.FromAmount), 'balance must be higher than token amount to exchange from')
+        if not ReceivedTokens[msg.FromContract][msg.From] then
+            ao.send({
+                Target = msg.From,
+                Action = 'Make-Order-Error',
+                Data = 'Sender does not have a registered balance',
+            })
+        end
         local sender = msg.From
         local sender_balance = ReceivedTokens[msg.FromContract][sender]
-
-        print('Sender balance before ' .. sender_balance)
 
         -- Check if maker has enough balance
 
@@ -64,11 +72,10 @@ Handlers.add(
 
         OpenOrders[CurrentId] = order
         CurrentId = CurrentId + 1;
-        print('Created order with order id '.. order.OrderId)
-        print(order)
         ao.send({
             Target = msg.From,
-            Data = 'Make Order succesful'
+            Action = 'Make-Order-Success',
+            Data = 'Succesfully create an order with the id ' .. order.OrderId,
         })
     end
 )
