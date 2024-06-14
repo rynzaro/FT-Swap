@@ -1,6 +1,6 @@
-FromContract = 'WQdF4IDJvyq_Odh_Pe2FDmN9cVdjatXd4akwFOupggI'
-ToContract = 'XgIYFq6hJ8OlyKJp8JbDIzYdREO5-dCfaTUhr92DeU0'
-SwapContract = 'o56cFYVua1yCrfgxmuMDsxJi_QvbG4zPZBP3xrVannY'
+FromContract = '5toZ7TMmA5OC4tAUcmcdPCiZ3HMLZNzTFz6zOQnvZkM'
+ToContract = 'MLkkESmb_B2uFlqY9m0EDoeZtfGRUryKo_uiijgr0q8'
+SwapContract = 'fYw1AQJZ62NbZARVFPhS_TPiAlh5Gd9hePD3B76Su9s'
 
 function GetBalance(contractId)
     ao.send({
