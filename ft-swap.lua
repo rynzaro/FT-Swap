@@ -15,27 +15,28 @@ Handlers.add(
         local sender = msg.Tags.Sender
         local quantity = bint(msg.Tags.Quantity)
 
-        if not Balances[depositContractId] then
-            --if contract ID has n record, create it
-            print('Register Contract ID')
-            Balances[depositContractId] = {[sender] = tostring(quantity)}
+        if not Balances[sender] then
+            --if sender has no record, create it
+            print('Register Sender')
+            Balances[sender] = {[depositContractId] = tostring(quantity)}
         else
-            if not Balances[depositContractId][sender] then
+            if not Balances[sender][depositContractId] then
                 print('Sender is depositing this currency for the first time')
-                Balances[depositContractId][sender] = tostring(quantity)
+                Balances[sender][depositContractId] = tostring(quantity)
             else
                 print('Updating deposit for existing sender.')
-                Balances[depositContractId][sender] = tostring(bint.__add(quantity, bint(Balances[depositContractId][sender])))
+                Balances[sender][depositContractId] = tostring(bint.__add(quantity, bint(Balances[sender][depositContractId])))
             end
         end
         ao.send({
             Target = msg.Tags.Sender,
             Action = 'Deposit-Notice',
             Data = 'Succesfully deposited ' .. tostring(quantity) .. ' tokens from fungible token process ' .. msg.From,
-            Balance = tostring(Balances[depositContractId][sender])
+            Balance = tostring(Balances[sender][depositContractId])
         })
     end
 )
+
 
 Handlers.add(
     'receiveMake',
@@ -46,25 +47,28 @@ Handlers.add(
         assert(type(msg.FromAmount) == 'string', 'Need to input amount to exchange from!')
         assert(type(msg.ToAmount) == 'string', 'Need to input amount to exchange to!')
 
-        -- we wanna handle that through an error message
-        local makerBalance = bint(Balances[msg.FromContract][msg.From])
-        local fromAmount = bint(msg.FromAmount)
-
-        if bint.__lt(makerBalance, fromAmount) then
-            ao.send({
-                Target = msg.From,
-                Action = 'Make-Order-Error',
-                Data = 'Balance to low for order creation. Balance ' .. Balances[msg.FromContract][msg.From] .. ', Quantity needed ' .. msg.FromAmount,
-            })
-            return
-        elseif not Balances[msg.FromContract][msg.From] then
+        -- further error handling
+        if not Balances[msg.From][msg.FromContract] then  -- Changed Line
             ao.send({
                 Target = msg.From,
                 Action = 'Make-Order-Error',
                 Data = 'Maker does not have a registered balance',
             })
+            return  
+
+        elseif bint.__lt(bint(Balances[msg.From][msg.FromContract]), bint(msg.FromAmount)) then
+            ao.send({
+                Target = msg.From,
+                Action = 'Make-Order-Error',
+                Data = 'Balance too low for order creation. Balance ' .. Balances[msg.From][msg.FromContract] .. ', Quantity needed ' .. msg.FromAmount,  -- Changed Line
+            })
             return
         end
+        
+        -- we wanna handle that through an error message
+        local makerBalance = bint(Balances[msg.From][msg.FromContract])  -- Changed Line
+        local fromAmount = bint(msg.FromAmount)
+
 
         local order = {
             OrderId = CurrentId,
@@ -75,18 +79,19 @@ Handlers.add(
             ToAmount = msg.ToAmount,
         }
 
-        Balances[msg.FromContract][msg.From] = tostring(bint.__sub(makerBalance, fromAmount))
+        Balances[msg.From][msg.FromContract] = tostring(bint.__sub(makerBalance, fromAmount))  -- Changed Line
 
         OpenOrders[CurrentId] = order
         CurrentId = CurrentId + 1;
         ao.send({
             Target = msg.From,
             Action = 'Make-Order-Success',
-            Data = 'Succesfully create an order with the id ' .. order.OrderId,
-            Balance = Balances[msg.FromContract][msg.From],
+            Data = 'Successfully created an order with the id ' .. order.OrderId,
+            Balance = Balances[msg.From][msg.FromContract],  -- Changed Line
         })
     end
 )
+
 
 Handlers.add(
     'receiveTake',
@@ -109,18 +114,28 @@ Handlers.add(
         local toAmount = bint(order.ToAmount)
         local taker = msg.From
 
+        -- check if taker has a balance in requested currency
+        if not Balances[taker][order.ToContract] then
+            ao.send({
+                Target = msg.From,
+                Action = 'Take-Order-Error',
+                Data = 'Take does not have a registered balance in necessary currency',
+            })
+            return
+        end
+
         -- check if taker balance is high enough
-        local takerBalance = bint(Balances[order.ToContract][taker])
+        local takerBalance = bint(Balances[taker][order.ToContract])
         if not bint.__le(toAmount, takerBalance) then
             ao.send({
                 Target = msg.From,
                 Action = 'Take-Order-Error',
-                Data = 'ERROR: Balance is too low. Balance: ' .. Balances[order.ToContract][taker] .. ', Quantity needed: ' .. order.ToAmount,
+                Data = 'ERROR: Balance is too low. Balance: ' .. Balances[taker][order.ToContract] .. ', Quantity needed: ' .. order.ToAmount,
             })
             return
         end
         -- if balance is high enough, deduct amount from the balance
-        Balances[order.ToContract][taker] = tostring(bint.__sub(takerBalance, toAmount))
+        Balances[taker][order.ToContract] = tostring(bint.__sub(takerBalance, toAmount))
 
         -- send maker's deposit to taker
         ao.send({
@@ -134,7 +149,7 @@ Handlers.add(
         ao.send({
             Target = msg.From,
             Action = 'Take-Order-Success',
-            Balance = Balances[order.ToContract][taker]
+            Balance = Balances[taker][order.ToContract]
         })
 
         -- send taker's deposit to maker

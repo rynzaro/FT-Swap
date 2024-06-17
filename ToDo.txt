@@ -1,0 +1,3 @@
+[] create ledgers - Balance[user][process] and not Balance[process][user]
+[] add order status to not having to delete them
+[] create an order struct? 
